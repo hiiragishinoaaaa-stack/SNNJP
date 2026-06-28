@@ -464,6 +464,36 @@ class VendingCog(commands.Cog):
         save_settings(settings)
         await interaction.response.send_message(f"`{category.value}` に `{name}` を登録しました。\n(ID: {service_id} / 最小:{min_qty:,} / 最大:{max_qty:,})", ephemeral=True)
 
+    @app_commands.command(name="フォロ爆商品削除", description=f"{ADMIN_LABEL}自販機から商品を削除します")
+    @app_commands.choices(category=[app_commands.Choice(name=k, value=k) for k in SNS_CONFIG.keys()])
+    @is_admin()
+    async def remove_service(self, interaction: discord.Interaction, category: app_commands.Choice[str], service_id: int):
+        settings = load_settings()
+        key = f"{category.value}_{service_id}"
+        if key in settings["services"]:
+            name = settings["services"][key]["name"]
+            del settings["services"][key]
+            save_settings(settings)
+            await interaction.response.send_message(f"✅ `{name}` (ID: {service_id}) を削除しました。", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"❌ 該当商品が見つかりません。\n`/フォロ爆商品一覧` でIDを確認してください。", ephemeral=True)
+
+    @app_commands.command(name="フォロ爆商品一覧", description=f"{ADMIN_LABEL}登録中の商品一覧を表示します")
+    @is_admin()
+    async def list_services(self, interaction: discord.Interaction):
+        settings = load_settings()
+        services = settings.get("services", {})
+        if not services:
+            return await interaction.response.send_message("現在登録されている商品はありません。", ephemeral=True)
+        emb = discord.Embed(title="📋 登録中の商品一覧", color=0x5865F2)
+        for key, s in services.items():
+            emb.add_field(
+                name=f"{s['name']} (ID: {s['id']})",
+                value=f"カテゴリ: {s['category']}\n単価: ¥{s['price']/1000}/件\n最小: {s['min']:,} / 最大: {s['max']:,}",
+                inline=False
+            )
+        await interaction.response.send_message(embed=emb, ephemeral=True)
+
     @app_commands.command(name="フォロ爆paypayログイン", description=f"{ADMIN_LABEL}PayPayにログインします")
     @is_admin()
     async def paypay_login(self, interaction: discord.Interaction, phone: str, password: str):
@@ -557,6 +587,8 @@ class VendingCog(commands.Cog):
         await interaction.response.send_message(embed=emb, view=RewardManagementView(self.bot), ephemeral=True)
 
     @add_service.error
+    @remove_service.error
+    @list_services.error
     @log_set.error
     @panel.error
     @paypay_login.error
