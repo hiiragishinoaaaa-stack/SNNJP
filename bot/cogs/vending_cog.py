@@ -308,7 +308,7 @@ class ServiceSelect(ui.Select):
             discord.SelectOption(
                 label=s["name"],
                 value=k,
-                description=f"¥{s['price']/1000}/単価 (最小{s['min']:,}〜)"
+                description=f"¥{s['price']/1000:.4g}/単価 (最小{s['min']:,}〜)"
             ) for k, s in self.category_services.items()
         ]
         super().__init__(placeholder=f"{category} の商品を選択してください", options=options)
@@ -411,7 +411,8 @@ class SNSSelectView(ui.View):
             content += f"\n{conf['emoji']} **{cat}**\n"
             for k, s in current_data.items():
                 if s["category"] == cat:
-                    content += f"┣ {s['name']}: `¥{s['price']/1000}/単価` \n"
+                    price_display = s['price'] / 1000
+                    content += f"┣ {s['name']}: `¥{price_display:.4g}/単価` \n"
 
         embed.description += content if content else "\n現在、このカテゴリに商品はございません。"
         embed.set_footer(text=BOT_FUROPA)
@@ -423,6 +424,12 @@ class SNSSelectView(ui.View):
         view = ui.View(timeout=120)
         view.add_item(ServiceSelect(selected_cat, current_data))
         await interaction.response.send_message(content=f" **{selected_cat}** の商品を選択してください：", view=view, ephemeral=True)
+        # セレクトメニューをリセットして再選択可能にする
+        self._build_interface()
+        try:
+            await interaction.message.edit(view=self)
+        except Exception:
+            pass
 
     async def status_callback(self, interaction: discord.Interaction):
         class StatusModal(ui.Modal, title="📊 注文状況の照会"):
@@ -454,15 +461,20 @@ class VendingCog(commands.Cog):
 
     @app_commands.command(name="フォロ爆商品追加", description=f"{ADMIN_LABEL}自販機に商品を追加します")
     @app_commands.choices(category=[app_commands.Choice(name=k, value=k) for k in SNS_CONFIG.keys()])
+    @app_commands.describe(price="1000件あたりの販売価格 (例: 800 = ¥0.8/件)")
     @is_admin()
-    async def add_service(self, interaction: discord.Interaction, category: app_commands.Choice[str], name: str, service_id: int, price: int, min_qty: int = 100, max_qty: int = 1000000):
+    async def add_service(self, interaction: discord.Interaction, category: app_commands.Choice[str], name: str, service_id: int, price: float, min_qty: int = 100, max_qty: int = 1000000):
         settings = load_settings()
         key = f"{category.value}_{service_id}"
         settings["services"][key] = {
             "category": category.value, "name": name, "id": service_id, "price": price, "min": min_qty, "max": max_qty
         }
         save_settings(settings)
-        await interaction.response.send_message(f"`{category.value}` に `{name}` を登録しました。\n(ID: {service_id} / 最小:{min_qty:,} / 最大:{max_qty:,})", ephemeral=True)
+        await interaction.response.send_message(
+            f"`{category.value}` に `{name}` を登録しました。\n"
+            f"(ID: {service_id} / 単価: ¥{price/1000:.4g} / 最小:{min_qty:,} / 最大:{max_qty:,})",
+            ephemeral=True
+        )
 
     @app_commands.command(name="フォロ爆商品削除", description=f"{ADMIN_LABEL}自販機から商品を削除します")
     @app_commands.choices(category=[app_commands.Choice(name=k, value=k) for k in SNS_CONFIG.keys()])
@@ -489,7 +501,7 @@ class VendingCog(commands.Cog):
         for key, s in services.items():
             emb.add_field(
                 name=f"{s['name']} (ID: {s['id']})",
-                value=f"カテゴリ: {s['category']}\n単価: ¥{s['price']/1000}/件\n最小: {s['min']:,} / 最大: {s['max']:,}",
+                value=f"カテゴリ: {s['category']}\n単価: ¥{s['price']/1000:.4g}/件\n最小: {s['min']:,} / 最大: {s['max']:,}",
                 inline=False
             )
         await interaction.response.send_message(embed=emb, ephemeral=True)
