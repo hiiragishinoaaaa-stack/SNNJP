@@ -1,7 +1,21 @@
+import sys
+import types
+
+# audioop is a C extension unavailable on iOS (a-Shell). Stub it out since
+# this bot does not use any voice features.
+_am = types.ModuleType("audioop")
+for _n in [
+    "add", "adpcm2lin", "alaw2lin", "avg", "avgpp", "bias", "byteswap",
+    "cross", "findfactor", "findfit", "findmax", "getsample", "lin2adpcm",
+    "lin2alaw", "lin2lin", "lin2ulaw", "max", "maxpp", "minmax", "mul",
+    "ratecv", "reverse", "rms", "tostereo", "tomono", "ulaw2lin",
+]:
+    setattr(_am, _n, lambda *a, **k: b"")
+sys.modules["audioop"] = _am
+
 import discord
 from discord.ext import commands
 import os
-import sys
 from dotenv import load_dotenv
 
 load_dotenv()
